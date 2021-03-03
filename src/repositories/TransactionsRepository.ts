@@ -12,11 +12,6 @@ interface CreateTransactionDTO {
   type: 'income' | 'outcome';
 }
 
-enum Type {
-  INCOME = 'income',
-  OUTCOME = 'outcome',
-}
-
 class TransactionsRepository {
   private transactions: Transaction[];
 
@@ -28,29 +23,40 @@ class TransactionsRepository {
     return this.transactions;
   }
 
-  private calculateBalance(operator: Type): number {
-    return this.transactions
-      .filter(t => t.type === operator)
-      .reduce((acc, tr) => acc + tr.value, 0);
-  }
-
   public getBalance(): Balance {
-    const income = this.calculateBalance(Type.INCOME);
-    const outcome = this.calculateBalance(Type.OUTCOME);
+    const { income, outcome } = this.transactions.reduce(
+      (accumulator: Balance, transaction: Transaction) => {
+        switch (transaction.type) {
+          case 'income':
+            accumulator.income += transaction.value;
+            break;
+          case 'outcome':
+            accumulator.outcome += transaction.value;
+            break;
+          default:
+            break;
+        }
+
+        return accumulator;
+      },
+      {
+        income: 0,
+        outcome: 0,
+        total: 0,
+      },
+    );
+
     const total = income - outcome;
 
-    const balance: Balance = { income, outcome, total };
-
-    return balance;
+    return { income, outcome, total };
   }
 
   public create({ title, value, type }: CreateTransactionDTO): Transaction {
-    const transaction = new Transaction({ title, value, type });
-
-    const { total } = this.getBalance();
-    if (type === Type.OUTCOME && total < value) {
-      throw Error('Cannot create outcome transaction without a valid balance');
-    }
+    const transaction = new Transaction({
+      title,
+      value,
+      type,
+    });
 
     this.transactions.push(transaction);
 
